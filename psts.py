@@ -34,15 +34,15 @@ def parse_sensors_output(output):
     """
     sensors_data = {}
     current_sensor = None
-    # Regex to match temperature lines. It matches lines like:
+    # Regex to match temperature lines.
+    # Matches lines like:
     # "Core 0:        +46.0°C  (high = +80.0°C, crit = +100.0°C)"
     temp_regex = re.compile(r'^\s*([\w\s\.\-]+):\s+([+-]?\d+\.\d+)[°º]([CF])')
     
-    # Process output line by line.
     for line in output.splitlines():
         line = line.strip()
         if not line:
-            # Blank line: reset current sensor block
+            # Blank line: reset current sensor block.
             current_sensor = None
             continue
         # If the line does not contain a colon, treat it as a sensor group header.
@@ -53,12 +53,12 @@ def parse_sensors_output(output):
         # Skip lines that identify the adapter.
         if line.startswith("Adapter"):
             continue
-        # If we haven't set a sensor group, try to guess one.
+        # If no sensor group is active, assign one based on the first word.
         if current_sensor is None:
             current_sensor = line.split()[0]
             sensors_data[current_sensor] = {}
 
-        # Look for a temperature reading in the line.
+        # Look for a temperature reading.
         match = temp_regex.match(line)
         if match:
             label = match.group(1).strip()
@@ -85,9 +85,10 @@ def parse_sysctl_output(output):
 
 class TempHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        # Print the client's IP address to the console
+        # Print the client's IP address every time someone accesses the server.
         print(f"Access from {self.client_address[0]}")
-        # When a GET request is received, get temperatures and return as JSON.
+        
+        # Retrieve temperature readings.
         temps = read_temperatures()
         response = json.dumps(temps).encode("utf-8")
         self.send_response(200)
@@ -96,24 +97,23 @@ class TempHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response)
     
-    # Override logging to reduce DOS-friendly verbosity.
+    # Override logging to reduce verbose output.
     def log_message(self, format, *args):
         return
 
 def run_server():
-    # Using a threaded TCP server to spawn a new thread for each request.
+    # Threaded TCP server to handle each connection in a new thread.
     with socketserver.ThreadingTCPServer(("", PORT), TempHTTPRequestHandler) as httpd:
         print(f"Serving temperatures on port {PORT}")
         httpd.serve_forever()
 
 if __name__ == "__main__":
-    # Spawn the HTTP server in a separate daemon thread.
+    # Start the HTTP server in a daemon thread.
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
 
-    # The main thread can perform other tasks or simply wait.
+    # Block indefinitely without busy-waiting.
     try:
-        while True:
-            pass  # Replace with other tasks if necessary.
+        threading.Event().wait()
     except KeyboardInterrupt:
         print("\nShutting down.")
